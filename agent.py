@@ -10,12 +10,7 @@ import chess
 
 from __future__ import annotations
 
-import json
-import random
 import time
-from pathlib import Path
-
-import chess
 import chess.polyglot
 
 
@@ -163,52 +158,38 @@ EG_PST = {
 }
 
 DEFAULT_WEIGHTS = {
-    "pawn": 100.0,
-    "knight": 320.0,
-    "bishop": 335.0,
-    "rook": 500.0,
-    "queen": 900.0,
-    "pst_mg": 1.0,
-    "pst_eg": 1.0,
-    "bishop_pair": 28.0,
-    "mobility": 3.2,
-    "doubled_pawn": -14.0,
-    "isolated_pawn": -11.0,
-    "backward_pawn": -10.0,
-    "passed_pawn": 3.4,
-    "connected_passer": 4.5,
-    "protected_passer": 5.5,
-    "rook_open_file": 18.0,
-    "rook_semi_open_file": 10.0,
-    "rook_seventh": 18.0,
-    "knight_outpost": 20.0,
-    "king_shield": 11.0,
-    "king_open_file": -17.0,
-    "castled_king": 26.0,
-    "undeveloped_minor": -8.0,
-    "early_queen": -14.0,
-    "trapped_piece": -14.0,
-    "space": 2.0,
-    "tempo": 9.0,
+    # Trained from 5,155 positions generated across 160 self-play games.
+    "pawn": 99.274353,
+    "knight": 320.438257,
+    "bishop": 334.555292,
+    "rook": 499.714261,
+    "queen": 899.821831,
+    "pst_mg": 0.45,
+    "pst_eg": 0.45,
+    "bishop_pair": 27.530522,
+    "mobility": 0.292651,
+    "doubled_pawn": -14.087305,
+    "isolated_pawn": -11.221494,
+    "backward_pawn": -10.069726,
+    "passed_pawn": 2.561626,
+    "connected_passer": 3.782619,
+    "protected_passer": 5.089356,
+    "rook_open_file": 17.925681,
+    "rook_semi_open_file": 10.221517,
+    "rook_seventh": 18.041045,
+    "knight_outpost": 20.001949,
+    "king_shield": 11.016291,
+    "king_open_file": -16.647056,
+    "castled_king": 25.794442,
+    "undeveloped_minor": -7.98244,
+    "early_queen": -14.062844,
+    "trapped_piece": -14.184898,
+    "space": -0.545096,
+    "tempo": 9.480026,
 }
 FEATURE_NAMES = tuple(DEFAULT_WEIGHTS)
-
-
-def _load_weights() -> tuple[dict[str, float], bool]:
-    path = Path(__file__).with_name("weights") / "linear_eval.json"
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-        supplied = payload.get("weights", payload)
-        weights = DEFAULT_WEIGHTS.copy()
-        for name in FEATURE_NAMES:
-            if name in supplied:
-                weights[name] = float(supplied[name])
-        return weights, bool(payload.get("training", {}).get("games", 0))
-    except (OSError, ValueError, TypeError, AttributeError):
-        return DEFAULT_WEIGHTS.copy(), False
-
-
-EVAL_WEIGHTS, LEARNED_MODEL_ACTIVE = _load_weights()
+EVAL_WEIGHTS = DEFAULT_WEIGHTS
+LEARNED_MODEL_ACTIVE = True
 
 # Entries: depth, score, bound flag, best move, generation.
 TT: dict[int, tuple[int, int, int, chess.Move | None, int]] = {}

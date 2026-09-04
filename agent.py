@@ -13,7 +13,6 @@ from __future__ import annotations
 import time
 import chess.polyglot
 
-
 INF = 1_000_000
 MATE = 100_000
 MAX_PLY = 96
@@ -29,8 +28,6 @@ PIECE_VALUE = {
     chess.KING: 20_000,
 }
 
-# Explicit, independently tunable middle-game and endgame piece-square tables.
-# Squares run a1..h8. Black uses the vertically mirrored square.
 MG_PST = {
     chess.PAWN: (
         0, 0, 0, 0, 0, 0, 0, 0,
@@ -158,7 +155,7 @@ EG_PST = {
 }
 
 DEFAULT_WEIGHTS = {
-    # Trained from 5,155 positions generated across 160 self-play games.
+
     "pawn": 99.274353,
     "knight": 320.438257,
     "bishop": 334.555292,
@@ -191,7 +188,6 @@ FEATURE_NAMES = tuple(DEFAULT_WEIGHTS)
 EVAL_WEIGHTS = DEFAULT_WEIGHTS
 LEARNED_MODEL_ACTIVE = True
 
-# Entries: depth, score, bound flag, best move, generation.
 TT: dict[int, tuple[int, int, int, chess.Move | None, int]] = {}
 HISTORY: dict[tuple[bool, int, int], int] = {}
 KILLERS: list[list[chess.Move | None]] = [[None, None] for _ in range(MAX_PLY)]
@@ -203,14 +199,11 @@ _deadline = 0.0
 _nodes = 0
 _completed_depth = 0
 
-
 class SearchTimeout(Exception):
     pass
 
-
 def _key(board: chess.Board) -> int:
     return chess.polyglot.zobrist_hash(board)
-
 
 def _check_time() -> None:
     global _nodes
@@ -218,18 +211,15 @@ def _check_time() -> None:
     if (_nodes & 63) == 0 and time.perf_counter() >= _deadline:
         raise SearchTimeout
 
-
 def _terminal_draw(board: chess.Board) -> bool:
     return board.halfmove_clock >= 100 or board.is_insufficient_material()
-
 
 def _relative_rank(square: int, colour: bool) -> int:
     rank = chess.square_rank(square)
     return rank if colour == chess.WHITE else 7 - rank
 
-
 def extract_features(board: chess.Board) -> dict[str, float]:
-    """Return interpretable features from White's perspective."""
+
     features = {name: 0.0 for name in FEATURE_NAMES}
 
     phase = 0
@@ -391,7 +381,6 @@ def extract_features(board: chess.Board) -> dict[str, float]:
     features["tempo"] = 1.0 if board.turn == chess.WHITE else -1.0
     return features
 
-
 def _evaluate_white(board: chess.Board) -> int:
     key = _key(board)
     cached = EVAL_CACHE.get(key)
@@ -402,20 +391,17 @@ def _evaluate_white(board: chess.Board) -> int:
     EVAL_CACHE[key] = score
     return score
 
-
 def _evaluate(board: chess.Board) -> int:
     score = _evaluate_white(board)
     return score if board.turn == chess.WHITE else -score
-
 
 def _captured_piece(board: chess.Board, move: chess.Move) -> int:
     if board.is_en_passant(move):
         return chess.PAWN
     return board.piece_type_at(move.to_square) or 0
 
-
 def _see(board: chess.Board, move: chess.Move) -> int:
-    """Fast static exchange estimate for capture ordering and pruning."""
+
     victim = _captured_piece(board, move)
     attacker = board.piece_type_at(move.from_square) or chess.PAWN
     promotion_gain = PIECE_VALUE.get(move.promotion or 0, 0) - (100 if move.promotion else 0)
@@ -429,18 +415,15 @@ def _see(board: chess.Board, move: chess.Move) -> int:
     if not can_recapture:
         return immediate
     loss = PIECE_VALUE.get(move.promotion or attacker, PIECE_VALUE[attacker])
-    # A defended capture often permits a recapture back; retain half of the
-    # moving piece's value as a conservative approximation of that continuation.
+
     if is_defended:
         loss //= 2
     return immediate - loss
-
 
 def _capture_value(board: chess.Board, move: chess.Move) -> int:
     attacker = board.piece_type_at(move.from_square) or chess.PAWN
     victim = _captured_piece(board, move)
     return 10 * PIECE_VALUE.get(victim, 0) - PIECE_VALUE[attacker]
-
 
 def _move_score(board: chess.Board, move: chess.Move, tt_move: chess.Move | None, ply: int) -> int:
     if move == tt_move:
@@ -456,7 +439,6 @@ def _move_score(board: chess.Board, move: chess.Move, tt_move: chess.Move | None
             return 3_900_000
     return HISTORY.get((board.turn, move.from_square, move.to_square), 0)
 
-
 def _ordered_moves(
     board: chess.Board, tt_move: chess.Move | None, ply: int, tactical_only: bool = False
 ) -> list[chess.Move]:
@@ -471,14 +453,12 @@ def _ordered_moves(
     moves.sort(key=lambda move: _move_score(board, move, tt_move, ply), reverse=True)
     return moves
 
-
 def _score_to_tt(score: int, ply: int) -> int:
     if score > MATE - MAX_PLY:
         return score + ply
     if score < -MATE + MAX_PLY:
         return score - ply
     return score
-
 
 def _score_from_tt(score: int, ply: int) -> int:
     if score > MATE - MAX_PLY:
@@ -487,13 +467,11 @@ def _score_from_tt(score: int, ply: int) -> int:
         return score + ply
     return score
 
-
 def _is_repetition(board: chess.Board, ply: int) -> bool:
     key = _key(board)
     if POSITION_COUNTS.get(key, 0) >= 2:
         return True
     return ply >= 4 and board.is_repetition(3)
-
 
 def _quiescence(board: chess.Board, alpha: int, beta: int, ply: int) -> int:
     _check_time()
@@ -529,7 +507,6 @@ def _quiescence(board: chess.Board, alpha: int, beta: int, ply: int) -> int:
             return beta
         alpha = max(alpha, score)
     return alpha
-
 
 def _negamax(
     board: chess.Board,
@@ -567,9 +544,6 @@ def _negamax(
         if alpha >= beta:
             return tt_score
 
-    # Full learned feature extraction is valuable at leaves but too expensive
-    # to repeat at every deep internal node. Depth-one nodes need it for
-    # futility pruning; deeper nodes rely on the search and transposition table.
     static_eval = _evaluate(board) if depth == 1 else 0
     has_non_pawn = any(
         board.pieces(piece, board.turn)
@@ -647,7 +621,6 @@ def _negamax(
         TT[key] = (depth, _score_to_tt(best_score, ply), flag, best_move, TT_GENERATION)
     return best_score
 
-
 def _root_search(
     board: chess.Board,
     depth: int,
@@ -686,7 +659,6 @@ def _root_search(
     )
     return best_score, best_move
 
-
 def _build_opening_book() -> dict[int, tuple[chess.Move, ...]]:
     lines = (
         "e2e4 e7e5 g1f3 b8c6 f1c4 g8f6 d2d3 f8c5 e1g1 d7d6 c2c3 e8g8",
@@ -715,10 +687,8 @@ def _build_opening_book() -> dict[int, tuple[chess.Move, ...]]:
             board.push(move)
     return {key: tuple(moves) for key, moves in choices.items()}
 
-
 OPENING_BOOK = _build_opening_book()
 BOOK_RNG = random.Random(time.time_ns())
-
 
 def _time_budget(board: chess.Board, time_left_ms: int) -> float:
     remaining = max(0.001, time_left_ms / 1000.0)
@@ -727,11 +697,10 @@ def _time_budget(board: chess.Board, time_left_ms: int) -> float:
     if remaining < 2.0:
         return min(0.10, remaining * 0.07)
     moves_to_go = max(14, 42 - board.fullmove_number)
-    budget = remaining / moves_to_go + 0.08  # cautiously use part of the rated increment
+    budget = remaining / moves_to_go + 0.08
     budget = min(budget, remaining * 0.10, 4.5)
     reserve = min(0.10, remaining * 0.08)
     return max(0.005, min(budget, remaining - reserve))
-
 
 def _trim_tables() -> None:
     if len(TT) > TT_LIMIT:
@@ -748,9 +717,8 @@ def _trim_tables() -> None:
     if len(EVAL_CACHE) > 180_000:
         EVAL_CACHE.clear()
 
-
 def get_move(fen: str, time_left_ms: int) -> str:
-    """Return a legal UCI move for the supplied position."""
+
     global _deadline, _nodes, _completed_depth, TT_GENERATION
 
     started = time.perf_counter()
